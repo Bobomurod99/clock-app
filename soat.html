@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Soat</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --accent: #4f8cff;
+    --accent2: #ff5f7e;
+    --text: #eef1f8;
+    --muted: #8a90a2;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f2f4f8;
+      --panel: #ffffff;
+      --text: #1a1d24;
+      --muted: #6b7280;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 24px;
+    min-height: 100%;
+  }
+  .card {
+    background: var(--panel);
+    border-radius: 24px;
+    padding: 32px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 380px;
+  }
+  #clock-face {
+    width: 240px;
+    height: 240px;
+    max-width: 60vw;
+    max-height: 60vw;
+  }
+  .digital {
+    font-size: clamp(28px, 8vw, 40px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .date {
+    color: var(--muted);
+    font-size: 15px;
+    text-align: center;
+  }
+  .tz {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: -8px;
+  }
+  .toggle {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .toggle button {
+    background: transparent;
+    border: 1px solid var(--muted);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .toggle button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <svg id="clock-face" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="96" fill="none" stroke="var(--muted)" stroke-width="2" opacity="0.4"/>
+      <g id="ticks"></g>
+      <line id="hour-hand" x1="100" y1="100" x2="100" y2="55" stroke="var(--text)" stroke-width="6" stroke-linecap="round"/>
+      <line id="minute-hand" x1="100" y1="100" x2="100" y2="35" stroke="var(--text)" stroke-width="4" stroke-linecap="round"/>
+      <line id="second-hand" x1="100" y1="100" x2="100" y2="25" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="5" fill="var(--accent)"/>
+    </svg>
+    <div class="digital" id="digital-time">--:--:--</div>
+    <div class="date" id="date-str"></div>
+    <div class="toggle">
+      <button id="btn24" class="active">24 soat</button>
+      <button id="btn12">12 soat (AM/PM)</button>
+    </div>
+  </div>
+
+<script>
+  const ticksGroup = document.getElementById('ticks');
+  for (let i = 0; i < 12; i++) {
+    const angle = (i * 30) * Math.PI / 180;
+    const x1 = 100 + 82 * Math.sin(angle);
+    const y1 = 100 - 82 * Math.cos(angle);
+    const x2 = 100 + 92 * Math.sin(angle);
+    const y2 = 100 - 92 * Math.cos(angle);
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "var(--muted)");
+    line.setAttribute("stroke-width", i % 3 === 0 ? "3" : "1.5");
+    ticksGroup.appendChild(line);
+  }
+
+  const hourHand = document.getElementById('hour-hand');
+  const minuteHand = document.getElementById('minute-hand');
+  const secondHand = document.getElementById('second-hand');
+  const digitalEl = document.getElementById('digital-time');
+  const dateEl = document.getElementById('date-str');
+  const btn24 = document.getElementById('btn24');
+  const btn12 = document.getElementById('btn12');
+
+  let use24 = true;
+  btn24.onclick = () => { use24 = true; btn24.classList.add('active'); btn12.classList.remove('active'); };
+  btn12.onclick = () => { use24 = false; btn12.classList.add('active'); btn24.classList.remove('active'); };
+
+  const weekdays = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
+  const months = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentyabr","Oktyabr","Noyabr","Dekabr"];
+
+  function pad(n) { return n.toString().padStart(2, '0'); }
+
+  function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+
+    const hourAngle = ((h % 12) + m / 60) * 30;
+    const minuteAngle = (m + s / 60) * 6;
+    const secondAngle = s * 6;
+
+    hourHand.setAttribute('transform', `rotate(${hourAngle} 100 100)`);
+    minuteHand.setAttribute('transform', `rotate(${minuteAngle} 100 100)`);
+    secondHand.setAttribute('transform', `rotate(${secondAngle} 100 100)`);
+
+    let displayH = h;
+    let suffix = '';
+    if (!use24) {
+      suffix = h >= 12 ? ' PM' : ' AM';
+      displayH = h % 12;
+      if (displayH === 0) displayH = 12;
+    }
+    digitalEl.textContent = `${pad(displayH)}:${pad(m)}:${pad(s)}${suffix}`;
+
+    dateEl.textContent = `${weekdays[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+    requestAnimationFrame(updateClock);
+  }
+  updateClock();
+</script>
+</body>
+</html>
